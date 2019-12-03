@@ -24,7 +24,7 @@ public abstract class AppDatabase extends RoomDatabase {    //Primary Key 각각
         }
         return instance;
     }
-    public static AppDatabase newInstance(Context context) {
+    public static AppDatabase newInstance(Context context) {//데이터베이스 생성
         instance = null;
         instance = Room.databaseBuilder(context.getApplicationContext(), AppDatabase.class, "jani_database").build();
         return instance;

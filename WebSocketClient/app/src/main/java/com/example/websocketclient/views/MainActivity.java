@@ -7,6 +7,7 @@ import android.os.Bundle;
 import android.util.Log;
 import android.view.View;
 import android.widget.Button;
+import android.widget.ProgressBar;
 import android.widget.Toast;
 
 import com.example.websocketclient.models.ServerModel;
@@ -25,9 +26,10 @@ import ua.naiksoftware.stomp.StompClient;
 import ua.naiksoftware.stomp.dto.StompHeader;
 
 public class MainActivity extends AppCompatActivity {
-//레지스터 버튼 기존 UI의 btnRegister -> register_btn 로 변경 yj
+////레지스터 버튼 기존 UI의 btnRegister -> register_btn 로 변경 yj
     private Button register_btn;
     private Button btnLogin;
+    ProgressBar pbLogin;
     private List<String> mDataSet = new ArrayList<>();
 
     private static final String TAG = "MainActivity";
@@ -41,7 +43,7 @@ public class MainActivity extends AppCompatActivity {
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
         setContentView(R.layout.activity_main);
-
+        pbLogin = (ProgressBar)findViewById(R.id.pbLogin);
         mStompClient = Stomp.over(Stomp.ConnectionProvider.OKHTTP, "ws://" + ServerModel.SERVER_IP + ":" + ServerModel.SERVER_PORT + "/janiwss/websocket");
         resetSubscriptions();
 
@@ -54,7 +56,6 @@ public class MainActivity extends AppCompatActivity {
             @Override
             public void onClick(View view) {
                 sendEchoViaStomp();             //이건 무엇일까 yj
-
                 Intent in = new Intent(MainActivity.this, RegisterActivity.class);
                 startActivity(in);
                 //registerActivity로 넘긴후에 chatroom으로 이동하게 코드 짤 예정 yj
@@ -62,15 +63,20 @@ public class MainActivity extends AppCompatActivity {
             }
         });
         //레지스터 버튼 끝
-
         ///////////////////////////
 
         //로그인 버튼 시작 yj
+        //5강 1분 31초 참고
         btnLogin = (Button)findViewById(R.id.btnLogin);
         btnLogin.setOnClickListener(new View.OnClickListener() {
             @Override
             public void onClick(View v) {
-                Toast.makeText(MainActivity.this, "LOGIN", Toast.LENGTH_SHORT).show();
+                pbLogin.setVisibility(View.VISIBLE);// 로그인되는거 보이게
+
+                //yj 여기에 데이터 받고 로그인 될때랑 안 될때 구현해야한다, DB에서 데이터 가져와서 일치하면 로그인 되는 코드
+                //if(!task.isSuccessful()){}        //로그인 안 될때
+                //else{} //로그인 될 때 pbLogin.setVisibility(View.GONE);
+
                 Intent ChatRoom = new Intent(MainActivity.this, ChatActivity.class);
                 startActivity(ChatRoom);
             }
@@ -80,9 +86,17 @@ public class MainActivity extends AppCompatActivity {
         ////////////////////////////////////
 
 
+
+
+
+
+
+
+
         //stompDisconnect();
         //toast("After STOMP Disconnection!");
-    }
+
+    }//onCreate
 
 
 
