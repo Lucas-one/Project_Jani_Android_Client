@@ -1,78 +1,60 @@
 <?xml version="1.0" encoding="utf-8"?>
-<RelativeLayout xmlns:android="http://schemas.android.com/apk/res/android"
-    xmlns:app="http://schemas.android.com/apk/res-auto"
-    xmlns:tools="http://schemas.android.com/tools"
-    android:orientation="vertical"
-    android:layout_width="match_parent"
-    android:layout_height="match_parent"
-    android:gravity="center_vertical|center_horizontal"
-    android:background="@color/colorPrimary"
-    tools:context=".views.MainActivity">
+<layout
+    xmlns:android="http://schemas.android.com/apk/res/android">
+    <data>
+        <variable
+            name="mainActivity"
+            type="com.example.websocketclient.views.MainActivity" />
+        <variable
+            name="mainViewModel"
+            type="com.example.websocketclient.viewmodels.MainViewModel" />
+        <variable
+            name="chatRoomAdapter"
+            type="com.example.websocketclient.views.utils.adapters.ChatRoomAdapter" />
+    </data>
 
+    <LinearLayout
+        android:layout_width="match_parent"
+        android:layout_height="match_parent"
+        android:orientation="vertical">
 
-    <TextView
-        android:layout_width="wrap_content"
-        android:layout_height="wrap_content"
-        android:text="Jani"
-        android:id="@+id/tvHello"
-        android:layout_centerHorizontal="true"
-        android:layout_centerInParent="true"
-        android:layout_marginBottom="30dp"
-        android:textColor="#ffffff"
-        android:textSize="60sp"
-        app:layout_constraintBottom_toBottomOf="parent"
-        app:layout_constraintLeft_toLeftOf="parent"
-        app:layout_constraintRight_toRightOf="parent"
-        app:layout_constraintTop_toTopOf="parent"
-        />
+        <com.google.android.material.tabs.TabLayout
+            android:id="@+id/mainTabLayout"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content">
 
-    <EditText
-        android:layout_width="200dp"
-        android:layout_height="40dp"
-        android:hint="ID"
-        android:background="#ffffff"
-        android:id="@+id/etID"
-        android:layout_centerInParent="true"
-        android:layout_below="@+id/tvHello"
-        />
-    <EditText
-        android:layout_width="200dp"
-        android:layout_height="40dp"
-        android:hint="PASSWORD"
-        android:layout_marginTop="1dp"
-        android:background="#ffffff"
-        android:id="@+id/etPassword"
-        android:layout_centerInParent="true"
-        android:layout_below="@+id/etID"
-        />
+            <com.google.android.material.tabs.TabItem
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:text="친구 목록">
 
-    <Button
-        android:text="REGISTER"
-        android:layout_width="200dp"
-        android:layout_height="wrap_content"
-        android:id="@+id/btnRegister"
-        android:layout_marginTop="10dp"
-        android:textAlignment="center"
-        android:layout_below="@+id/etPassword"
-        android:layout_centerInParent="true"
-        />
+            </com.google.android.material.tabs.TabItem>
+            <com.google.android.material.tabs.TabItem
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:text="채팅 목룍">
 
-    <Button
-        android:text="LOGIN"
-        android:layout_width="200dp"
-        android:layout_height="wrap_content"
-        android:id="@+id/btnLogin"
-        android:textAlignment="center"
-        android:layout_below="@+id/btnRegister"
-        android:layout_centerInParent="true"
-        />
-    <Button
-        android:text="CANCEL"
-        android:layout_width="200dp"
-        android:layout_height="wrap_content"
-        android:id="@+id/btnCANCEL"
-        android:textAlignment="center"
-        android:layout_below="@+id/btnLogin"
-        android:layout_centerInParent="true"
-        />
-</RelativeLayout>
+            </com.google.android.material.tabs.TabItem>
+            <com.google.android.material.tabs.TabItem
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:text="일정">
+
+            </com.google.android.material.tabs.TabItem>
+            <com.google.android.material.tabs.TabItem
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:text="설정">
+
+            </com.google.android.material.tabs.TabItem>
+        </com.google.android.material.tabs.TabLayout>
+
+        <androidx.viewpager.widget.ViewPager
+            android:id="@+id/mainViewPager"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content">
+
+        </androidx.viewpager.widget.ViewPager>
+    </LinearLayout>
+
+</layout>
