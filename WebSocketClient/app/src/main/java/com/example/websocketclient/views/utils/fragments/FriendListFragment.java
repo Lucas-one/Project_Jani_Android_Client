@@ -3,6 +3,7 @@ package com.example.websocketclient.views.utils.fragments;
 
 import android.content.Intent;
 import android.os.Bundle;
+import android.util.Log;
 import android.view.LayoutInflater;
 import android.view.View;
 import android.view.ViewGroup;
@@ -36,13 +37,12 @@ public class FriendListFragment extends Fragment {
     @Override
     public View onCreateView(@NonNull LayoutInflater inflater, @Nullable ViewGroup container, @Nullable Bundle savedInstanceState) {
         fragmentFriendListBinding = DataBindingUtil.inflate(inflater, R.layout.fragment_friend_list, container, false);
-        fragmentFriendListBinding.setLifecycleOwner(this);
+        fragmentFriendListBinding.setLifecycleOwner(getViewLifecycleOwner());
 
         friendListFragmentViewModel = ViewModelProviders.of(this).get(FriendListFragmentViewModel.class);
         fragmentFriendListBinding.setFriendListViewModel(friendListFragmentViewModel);
 
         friendListAdapter = new FriendListAdapter(friendListFragmentViewModel);
-
         fragmentFriendListBinding.friendListRecyclerView.setLayoutManager(new LinearLayoutManager(container.getContext()));
         fragmentFriendListBinding.friendListRecyclerView.setAdapter(friendListAdapter);
 
@@ -68,16 +68,18 @@ public class FriendListFragment extends Fragment {
                 });
 
 
-        // Button CLick Event를 ViewModel로 부터 받는다.
+        // Button Click Event를 ViewModel로 부터 받는다.
         friendListFragmentViewModel.getButtonClickEvent()
                 .observe(getViewLifecycleOwner(), new Observer<Integer>() {
                     @Override
                     public void onChanged(Integer command) {
                         if (command == ADD) {
+                            // 친구추가 Activity로 Intent
                             Intent intent = new Intent(getActivity(), AddFriendActivity.class);
                             startActivity(intent);
                         }
                         else if (command == REQ) {
+                            // 친구요청 Activity로 Intent
                             Intent intent = new Intent(getActivity(), RequestFriendActivity.class);
                             startActivity(intent);
                         }
@@ -89,6 +91,7 @@ public class FriendListFragment extends Fragment {
                     @Override
                     public void onChanged(Boolean check) {
                         if (check) {
+                            // 프로필 Activity로 Intent
                             Intent intent = new Intent(getActivity(), UserProfileActivity.class);
                             startActivity(intent);
                         }

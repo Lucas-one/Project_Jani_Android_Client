@@ -1,19 +1,20 @@
 package com.example.websocketclient.models;
 
 import android.content.Context;
+import android.os.Message;
 import android.util.Log;
 
-import androidx.lifecycle.AndroidViewModel;
-
 import com.example.websocketclient.database.AppDatabase;
-import com.example.websocketclient.database.entity.UserInformation;
-import com.example.websocketclient.retrofit.models.RegisterModel;
+import com.example.websocketclient.database.entity.ChatRoomModel;
+import com.example.websocketclient.database.entity.MessageModel;
+import com.example.websocketclient.database.entity.ParticipantModel;
+import com.example.websocketclient.database.entity.RegisterModel;
+import com.example.websocketclient.database.entity.RequestModel;
+import com.example.websocketclient.database.entity.UserInformationModel;
 import com.example.websocketclient.retrofit.utils.RetrofitClient;
 import com.example.websocketclient.retrofit.utils.RetrofitCommunicationService;
 import com.example.websocketclient.viewmodels.MainViewModel;
-import com.example.websocketclient.views.RequestFriendActivity;
 
-import java.lang.reflect.Array;
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
@@ -23,9 +24,12 @@ import io.reactivex.Completable;
 import io.reactivex.CompletableTransformer;
 import io.reactivex.Flowable;
 import io.reactivex.Maybe;
+import io.reactivex.Single;
 import io.reactivex.android.schedulers.AndroidSchedulers;
-import io.reactivex.disposables.CompositeDisposable;
+import io.reactivex.functions.Function3;
+import io.reactivex.functions.Function5;
 import io.reactivex.schedulers.Schedulers;
+import kotlin.jvm.functions.Function0;
 import ua.naiksoftware.stomp.Stomp;
 import ua.naiksoftware.stomp.StompClient;
 import ua.naiksoftware.stomp.dto.LifecycleEvent;
@@ -40,21 +44,21 @@ public class ModelRepository {
     private Context context;
     private AppDatabase db;
     private RetrofitCommunicationService retrofitCommunicationService;
-    private UserInformation userInformation = new UserInformation();
+    private RegisterModel userRegisterModel;
     private StompClient mStompClient;
 
-    private Map<String, ChatRoomModel> oldChatRoomModelMap = new HashMap<>();
-    private Map<String, ChatRoomModel> newChatRoomModelMap = new HashMap<>();
-    private HashMap<String, FriendModel> friendModelHashMap = new HashMap<>();
-    private HashMap<String, RequestModel> requestModelHashMap = new HashMap<>();
+    private List<UserInformationModel> userInformationModels;
+    private List<RequestModel> requestModels;
+    private List<ChatRoomModel> chatRoomModels;
+    private List<MessageModel> messageModels;
+    private List<ParticipantModel> participantModels;
+    private List<ChatModel> chatModels;
 
-    private ArrayList<ChatRoomModel> oldChatRoomModels = new ArrayList<>();
-    private ArrayList<ChatRoomModel> newChatRoomModels = new ArrayList<>();
-    private ArrayList<FriendModel> friendModels;
-    private ArrayList<RequestModel> requestModels;
+    private UserInformationModel selectedUserInformationModel;
+    private ChatModel selectedChatModel;
 
-    private FriendModel selectedFriendModel;
-    private ChatRoomModel selectedChatRoomModel;
+    private MainViewModel mainViewModel;
+
 
 
     // Singleton Pattern
@@ -68,19 +72,14 @@ public class ModelRepository {
 
     public ModelRepository() {
         mStompClient = Stomp.over(Stomp.ConnectionProvider.OKHTTP, "ws://" + ServerModel.SERVER_IP + ":" + ServerModel.SERVER_PORT + "/janiwss/websocket");
+    }
 
-        requestModels = new ArrayList<>(requestModelHashMap.values());
-        friendModels = new ArrayList<>(friendModelHashMap.values());
+    public void setUserRegisterModel(RegisterModel registerModel) {
+        this.userRegisterModel = registerModel;
+    }
 
-        // Some Data Initialization Here... Or Call Initializer Method
-        /*oldFriends.add(new FriendModel("나준엽"));
-        oldFriends.add(new FriendModel("김용재"));
-
-        RequestModel requestModel = new RequestModel();
-        requestModel.setSenderName("sender");
-        requestModel.setReceiverName("receiver");
-        requestModel.setStatus("REQ");
-        requestModels.add(requestModel);*/
+    public RegisterModel getUserRegisterModel() {
+        return this.userRegisterModel;
     }
 
     public void setReferences(Context context) {
@@ -89,103 +88,325 @@ public class ModelRepository {
         retrofitCommunicationService = RetrofitClient.getInstance();
     }
 
-    public void setSelectedFriendModel(FriendModel selectedFriendModel) {
-        this.selectedFriendModel = selectedFriendModel;
+    public void setMainViewModel(MainViewModel mainViewModel) {
+        this.mainViewModel = mainViewModel;
     }
 
-    public FriendModel getSelectedFriendModel() {
-        return this.selectedFriendModel;
+    public MainViewModel getMainViewModel() {
+        return this.mainViewModel;
     }
 
-    public void setSelectedChatRoomModel(ChatRoomModel selectedChatRoomModel) {
-        this.selectedChatRoomModel = selectedChatRoomModel;
+    public UserInformationModel getSelectedUserInformationModel() {
+        return selectedUserInformationModel;
     }
 
-    public ChatRoomModel getSelectedChatRoomModel() {
-        return selectedChatRoomModel;
+    public void setSelectedUserInformationModel(UserInformationModel selectedUserInformationModel) {
+        this.selectedUserInformationModel = selectedUserInformationModel;
     }
 
-    public HashMap<String, RequestModel> getRequestModelHashMap() {
-        return this.requestModelHashMap;
+    public ChatModel getSelectedChatModel() {
+        return selectedChatModel;
     }
 
-    public ArrayList<RequestModel> getRequestModelList() {
-        return this.requestModels;
+    public void setSelectedChatModel(ChatModel selectedChatModel) {
+        this.selectedChatModel = selectedChatModel;
+    }
+
+    // ================================== RequestModel =============================================
+
+    public Maybe<List<RequestModel>> loadRequestModels() {
+        return db.requestModelDao().getRequestModels()
+                .subscribeOn(Schedulers.io());
+    }
+
+    public Maybe<RequestModel> getRequestModel(String senderName) {
+        return db.requestModelDao().getRequestModel(senderName)
+                .subscribeOn(Schedulers.io())
+                .observeOn(AndroidSchedulers.mainThread());
     }
 
     public RequestModel getRequestModelAt(int position) {
         return requestModels.get(position);
     }
 
-    public void eraseRequestModelAt(int position) {
+    public void addRequestModel(RequestModel requestModel) {
+        this.requestModels.add(requestModel);
+    }
+
+    public void deleteRequestModel(String senderName) {
+        for (int i = 0; i < this.requestModels.size(); i++) {
+            if (this.requestModels.get(i).getReqSenderName().equals(senderName)) {
+                requestModels.remove(i);
+                return;
+            }
+        }
+    }
+
+    public void deleteRequestModel(int position) {
         requestModels.remove(position);
     }
 
-    /*public void addRequestModel(RequestModel requestModel) {
-        requestModels.add(requestModel);
-    }*/
-
-    public HashMap<String, FriendModel> getFriendModelHashMap() {
-        return friendModelHashMap;
-    }
-
-    public ArrayList<FriendModel> getFriendModelList() {
-        return this.friendModels;
-    }
-
-    public FriendModel getFriendModelAt(int position) {
-        return friendModels.get(position);
-    }
-
-    /*public void addFriendList(FriendModel friendModel) {
-        friendModels.add(friendModel);
-    }*/
-
-    public ArrayList<ChatRoomModel> getChatRoomList() {
-        return this.oldChatRoomModels;
-    }
-
-    public ChatRoomModel getChatRoomModel(int position) {
-        return oldChatRoomModels.get(position);
-    }
-
-    public void addChatRoomList(ChatRoomModel chatRoomModel) {
-        oldChatRoomModels.add(chatRoomModel);
-        newChatRoomModels.add(chatRoomModel);
-    }
-
-    public UserInformation getCurUserInformation() {
-        return userInformation;
-    }
-
-    public void setCurUserInformation(UserInformation userInformation) {
-        this.userInformation.setUserName(userInformation.getUserName());
-    }
-
-    // ============================= Room Databse ==================================================
-    public Maybe<UserInformation> dbGetUserInformation() {
-        return db.userDao().isUserExist()
+    public Completable deleteRequestModelFromClientDB(String senderName) {
+        return db.requestModelDao().deleteRequestModel(senderName)
                 .subscribeOn(Schedulers.io())
                 .observeOn(AndroidSchedulers.mainThread());
     }
 
-    public Completable dbInsertUserInformation(UserInformation userInformation) {
-        return db.userDao().insertUserName(userInformation).subscribeOn(Schedulers.io())
+    public List<RequestModel> getRequestModels() {
+        return requestModels;
+    }
+
+    public void setRequestModels(List<RequestModel> requestModels) {
+        this.requestModels = requestModels;
+    }
+
+    public List<UserInformationModel> getUserInformationModels() {
+        return userInformationModels;
+    }
+
+    public void setUserInformationModels(List<UserInformationModel> userInformationModels) {
+        this.userInformationModels = userInformationModels;
+    }
+
+    public List<ChatRoomModel> getChatRoomModels() {
+        return this.chatRoomModels;
+    }
+
+    public void setChatRoomModels(List<ChatRoomModel> chatRoomModels) {
+        this.chatRoomModels = chatRoomModels;
+    }
+
+    public List<MessageModel> getMessageModels() {
+        return this.messageModels;
+    }
+
+    public void setMessageModels(List<MessageModel> messageModels) {
+        this.messageModels = messageModels;
+    }
+
+    public List<ParticipantModel> getParticipantModels() {
+        return this.participantModels;
+    }
+
+    public void setParticipantModels(List<ParticipantModel> participantModels) {
+        this.participantModels = participantModels;
+    }
+
+    public UserInformationModel getUserInformationModelAt(int position) {
+        return userInformationModels.get(position);
+    }
+
+    public void addUserInformationModel(UserInformationModel userInformationModel) {
+        this.userInformationModels.add(userInformationModel);
+    }
+
+    public void deleteUserInformationModel(String userName) {
+        for (int i = 0; i < this.userInformationModels.size(); i++) {
+            if (this.userInformationModels.get(i).getUserInfoUserName().equals(userName)) {
+                this.userInformationModels.remove(i);
+                return;
+            }
+        }
+    }
+
+    public void addMessageModelToChatModels(MessageModel messageModel) {
+        //String chatChannel = "/queue/" + messageModel.getMsgSenderName();
+        String chatChannel = messageModel.getChatChannel();
+        Log.d("QueueChannelCheck", "ChatChannel : " + chatChannel);
+
+        for (ChatModel cm : this.chatModels) {
+            if (cm.getChatRoomModel().getChatChannel().equals(chatChannel)) {
+                cm.getMessageModels().add(messageModel);
+            }
+        }
+    }
+
+    public void addToChatModels(ChatRoomModel chatRoomModel) {
+        String chatChannel = chatRoomModel.getChatChannel();
+
+        List<MessageModel> mMessageModels = new ArrayList<>();
+        List<ParticipantModel> mParticipantModels = new ArrayList<>();
+
+        for (MessageModel mm : this.messageModels) {
+            if (mm.getChatChannel().equals(chatChannel)) {
+                mMessageModels.add(mm);
+            }
+        }
+
+        for (ParticipantModel pm : this.participantModels) {
+            if (pm.getChatChannel().equals(chatChannel)) {
+                mParticipantModels.add(pm);
+            }
+        }
+
+        chatModels.add(new ChatModel(chatRoomModel, mMessageModels, mParticipantModels));
+    }
+
+    public ChatModel getChatModel(String queueChannel) {
+        for (ChatModel cm : this.chatModels) {
+            if (cm.getChatRoomModel().getChatChannel().equals(queueChannel)) {
+                return cm;
+            }
+        }
+
+        return null;
+    }
+
+    public ChatModel createChatModel(String queueChannel, String chatRoomName, List<ParticipantModel> participants) {
+        String userName = getUserRegisterModel().getRegUserName();
+        ChatModel chatModel = null;
+
+        ChatRoomModel mChatRoomModel = new ChatRoomModel(0, userName, queueChannel, chatRoomName);
+        chatModel = new ChatModel(mChatRoomModel, new ArrayList<MessageModel>(), participants);
+        chatModels.add(chatModel);
+
+        return chatModel;
+    }
+
+    public List<ChatModel> getChatModels() {
+        return chatModels;
+    }
+
+    public ChatModel getChatModelAt(int position) {
+        return chatModels.get(position);
+    }
+
+    public Maybe<List<UserInformationModel>> loadUserInformationModels() {
+        return db.userDao().getUserInformationModels()
+                .subscribeOn(Schedulers.io());
+    }
+
+    public Maybe<List<ChatRoomModel>> loadChatRoomModels() {
+        return db.chatModelDao().getChatRoomModels()
+                .subscribeOn(Schedulers.io());
+    }
+
+    public Maybe<List<MessageModel>> loadMessageModels()  {
+        return db.chatModelDao().getMessageModels()
+                .subscribeOn(Schedulers.io());
+    }
+
+    public Maybe<List<ParticipantModel>> loadParticipantModels() {
+        return db.chatModelDao().getParticipantModels()
+                .subscribeOn(Schedulers.io());
+    }
+
+    public Maybe<String> loadData() {
+        userInformationModels = new ArrayList<>();
+        requestModels = new ArrayList<>();
+        chatRoomModels = new ArrayList<>();
+        messageModels = new ArrayList<>();
+        participantModels = new ArrayList<>();
+        chatModels = new ArrayList<>();
+
+        return Maybe.zip(
+                loadUserInformationModels(),
+                loadRequestModels(),
+                loadChatRoomModels(),
+                loadMessageModels(),
+                loadParticipantModels(),
+                new Function5<List<UserInformationModel>, List<RequestModel>, List<ChatRoomModel>, List<MessageModel>, List<ParticipantModel>, String>() {
+                    @Override
+                    public String apply(List<UserInformationModel> userInformationModels, List<RequestModel> requestModels, List<ChatRoomModel> chatRoomModels, List<MessageModel> messageModels, List<ParticipantModel> participantModels) throws Exception {
+                        setUserInformationModels(userInformationModels);
+                        setRequestModels(requestModels);
+                        setChatRoomModels(chatRoomModels);
+                        setMessageModels(messageModels);
+                        setParticipantModels(participantModels);
+
+                        for (ChatRoomModel crm : getChatRoomModels()) {
+                            addToChatModels(crm);
+                        }
+
+                        Log.d("loadDataCheck", "chatModelSize = " + getChatModels().size());
+
+                        return "FIN_LOAD";
+                    }
+                }).observeOn(AndroidSchedulers.mainThread());
+    }
+
+    /*public Single<String> insertClientDBChatModel(ChatRoomModel chatRoomModel, MessageModel messageModel, ParticipantModel participantModel) {
+        return Single.zip(
+                insertClientDBChatRoomModel(chatRoomModel),
+                insertClientDBMessageModel(messageModel),
+                insertClientDBParticipantModel(participantModel),
+                new Function3<Integer, Integer, Integer, String>() {
+                    @Override
+                    public String apply(Integer integer, Integer integer2, Integer integer3) throws Exception {
+                        return "CHAT_MODEL_FIN";
+                    }
+                }
+        ).observeOn(AndroidSchedulers.mainThread());
+    }*/
+
+    // ============================= Room Databse ==================================================
+    public Maybe<RegisterModel> getClientDBRegisterModel() {
+        return db.registerModelDao().getUserRegisterModels()
+                .subscribeOn(Schedulers.io())
+                .observeOn(AndroidSchedulers.mainThread());
+    }
+
+    public Completable insertClientDBRegisterModel(RegisterModel registerModel) {
+        return db.registerModelDao().insertRegisterModel(registerModel)
+                .subscribeOn(Schedulers.io())
+                .observeOn(AndroidSchedulers.mainThread());
+    }
+
+    public Single<PlainTextModel> insertServerDBRegisterModel(RegisterModel userRegisterModel) {
+        return retrofitCommunicationService.registerUserRegisterModelToServer(userRegisterModel)
+                .subscribeOn(Schedulers.io())
+                .observeOn(AndroidSchedulers.mainThread());
+    }
+
+    public Completable insertClientDBUserInformationModel(UserInformationModel userInformationModel) {
+        return db.userDao().insertUserInformationModel(userInformationModel)
+                .subscribeOn(Schedulers.io())
+                .observeOn(AndroidSchedulers.mainThread());
+    }
+
+    public Completable insertClientDBRequestModel(RequestModel requestModel) {
+        return db.requestModelDao().insertRequestModel(requestModel)
+                .subscribeOn(Schedulers.io())
+                .observeOn(AndroidSchedulers.mainThread());
+    }
+
+    public Completable insertClientDBChatRoomModel(ChatRoomModel chatRoomModel) {
+        return db.chatModelDao().insertChatRoomModel(chatRoomModel)
+                .subscribeOn(Schedulers.io())
+                .observeOn(AndroidSchedulers.mainThread());
+    }
+
+    public Completable insertClientDBMessageModel(MessageModel messageModel) {
+        return db.chatModelDao().insertMessageModel(messageModel)
+                .subscribeOn(Schedulers.io())
+                .observeOn(AndroidSchedulers.mainThread());
+    }
+
+    public Completable insertClientDBParticipantModel(ParticipantModel participantModel) {
+        return db.chatModelDao().insertParticipantModel(participantModel)
+                .subscribeOn(Schedulers.io())
                 .observeOn(AndroidSchedulers.mainThread());
     }
 
     // =============================== Retrofit ====================================================
-    public Maybe<RegisterModel> retrofitGetUserInformation(RegisterModel registerModel) {
-        return retrofitCommunicationService.getUserInformation(registerModel)
+    public Single<PlainTextModel> retrofitCheckDuplicateUserName(String userName) {
+        return retrofitCommunicationService.userNameDuplicationCheck(userName)
                 .subscribeOn(Schedulers.io())
                 .observeOn(AndroidSchedulers.mainThread());
     }
 
-    public Maybe<RegisterModel> retrofitFindUserInformation(RegisterModel registerModel) {
-        return retrofitCommunicationService.findUserInformation(registerModel)
+    public Single<PlainTextModel> retrofitFindUserInformationModel(String userName) {
+        return retrofitCommunicationService.findUserInformationModel(userName)
                 .subscribeOn(Schedulers.io())
                 .observeOn(AndroidSchedulers.mainThread());
     }
+
+    public Single<UserInformationModel> retrofitGetUserInformationModel(String userName) {
+        return retrofitCommunicationService.getUserInformationModel(userName)
+                .subscribeOn(Schedulers.io())
+                .observeOn(AndroidSchedulers.mainThread());
+    }
+
 
     // ========================= STOMP over Websocket ==============================================
 

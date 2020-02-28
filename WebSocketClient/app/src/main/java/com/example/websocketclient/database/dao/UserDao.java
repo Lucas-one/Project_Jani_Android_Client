@@ -5,30 +5,24 @@ import androidx.room.Delete;
 import androidx.room.Insert;
 import androidx.room.Query;
 
-import com.example.websocketclient.database.entity.UserInformation;
+import com.example.websocketclient.database.entity.UserInformationModel;
 
 import java.util.List;
 
 import io.reactivex.Completable;
+import io.reactivex.Flowable;
 import io.reactivex.Maybe;
+import io.reactivex.Observable;
+import io.reactivex.Single;
 
 @Dao
 public interface UserDao {
-
     @Query("SELECT * FROM user_information")
-    Maybe<UserInformation> isUserExist();
-
-    /*
-    @Query("SELECT * FROM user_information WHERE user_name = :userName")
-    UserInformation findByName(String userName);
-    */
-
-    @Query("DELETE FROM user_information")
-    Completable deleteAll();
+    Maybe<List<UserInformationModel>> getUserInformationModels();
 
     @Insert
-    Completable insertUserName(UserInformation userInformation);
+    Completable insertUserInformationModel(UserInformationModel userInformationModel);
 
     @Delete
-    void delete(UserInformation userInformation);
+    void delete(UserInformationModel userInformationModel);
 }

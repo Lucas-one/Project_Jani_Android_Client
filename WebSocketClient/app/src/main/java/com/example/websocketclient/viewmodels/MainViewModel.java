@@ -2,61 +2,45 @@ package com.example.websocketclient.viewmodels;
 
 import android.app.Application;
 import android.content.Context;
-import android.os.Message;
 import android.util.Log;
 import android.widget.Toast;
 
 import androidx.annotation.NonNull;
-import androidx.databinding.ObservableField;
 import androidx.lifecycle.AndroidViewModel;
 import androidx.lifecycle.LiveData;
 import androidx.lifecycle.MutableLiveData;
 
-import com.example.websocketclient.database.entity.UserInformation;
-import com.example.websocketclient.models.ChatRoomModel;
+import com.example.websocketclient.database.entity.ChatRoomModel;
+import com.example.websocketclient.database.entity.ParticipantModel;
+import com.example.websocketclient.database.entity.UserInformationModel;
+import com.example.websocketclient.models.ChatModel;
 import com.example.websocketclient.models.FriendModel;
-import com.example.websocketclient.models.MessageModel;
+import com.example.websocketclient.database.entity.MessageModel;
 import com.example.websocketclient.models.ModelRepository;
-import com.example.websocketclient.models.RequestModel;
-import com.example.websocketclient.views.MainActivity;
+import com.example.websocketclient.database.entity.RequestModel;
 import com.google.gson.Gson;
 
 import java.io.Serializable;
 import java.util.ArrayList;
+import java.util.List;
 
+import io.reactivex.CompletableObserver;
+import io.reactivex.CompletableOperator;
 import io.reactivex.MaybeObserver;
+import io.reactivex.SingleObserver;
 import io.reactivex.disposables.CompositeDisposable;
 import io.reactivex.disposables.Disposable;
-import ua.naiksoftware.stomp.StompClient;
 import ua.naiksoftware.stomp.dto.LifecycleEvent;
 
 public class MainViewModel extends AndroidViewModel implements Serializable {
     private final String TAG = "MainViewModelLog";
-    public static final String LOGIN = "login";
-    public static final String PASSCODE = "passcode";
-    public static final String ACK = "ACK";
-    public static final String WAIT = "WAIT";
 
     private Context context;
     private CompositeDisposable compositeDisposable = new CompositeDisposable();
-    private StompClient mStompClient;
-    private UserInformation userInformation = new UserInformation();
     private ModelRepository modelRepository;
-    public MessageModel sMessageModel;
-    public MessageModel rMessageModel;
-
-
-    public ObservableField<String> messageEdit = new ObservableField<>();
 
     private MutableLiveData<LifecycleEvent.Type> stompHealthEvent;
-    private MutableLiveData<Integer> positionEvent;
-    private MutableLiveData<Integer> friendListFragmentButtonEvent;
 
-    private MutableLiveData<Boolean> requestChannelEvent;
-    private MutableLiveData<MessageModel> queueChannelEvent;
-    private MutableLiveData<MessageModel> topicChannelEvent;
-
-    private ArrayList<MessageModel> messageModels = new ArrayList<>();
     private Gson gson = new Gson();
 
     public MainViewModel(@NonNull Application application) {
@@ -70,8 +54,11 @@ public class MainViewModel extends AndroidViewModel implements Serializable {
         // View.getContext() : 현재 실행되고 있는 View의 Context를 Return, this와 같다.
         modelRepository = ModelRepository.getInstance();
         modelRepository.setReferences(context);
+        modelRepository.setMainViewModel(this);
 
         createRequestChannel();
+        createQueueChannel();
+        //createTopicChannel();
         stompConnect();
     }
 
@@ -79,24 +66,8 @@ public class MainViewModel extends AndroidViewModel implements Serializable {
         return this.modelRepository;
     }
 
-    public ArrayList<MessageModel> getChatAdapterArrayList() {
-        return messageModels;
-    }
-
-    public LiveData<Integer> getFriendListFragmentButtonEvent() {
-        return friendListFragmentButtonEvent = new MutableLiveData<>();
-    }
-
     public LiveData<LifecycleEvent.Type> getStompHealthEvent() {
         return stompHealthEvent = new MutableLiveData<>();
-    }
-
-    public LiveData<Integer> getMessageEvent() {
-        return positionEvent = new MutableLiveData<>();
-    }
-
-    public LiveData<Boolean> getRequestChannelEvent() {
-        return requestChannelEvent = new MutableLiveData<>();
     }
 
     public void stompConnect() {
@@ -120,75 +91,221 @@ public class MainViewModel extends AndroidViewModel implements Serializable {
         modelRepository.stompConnectStart();
     }
 
-    public void stompDisconnect() {
-
-       mStompClient.disconnect();
-    }
-
     public void createRequestChannel() {
-        Toast.makeText(context, modelRepository.getCurUserInformation().getUserName(), Toast.LENGTH_LONG).show();
-        compositeDisposable.add(modelRepository.stompGetTopicMessage("/req/" + modelRepository.getCurUserInformation().getUserName())
+        compositeDisposable.add(modelRepository.stompGetTopicMessage("/req/" + modelRepository.getUserRegisterModel().getRegUserName())
                 .subscribe(topicMessage -> {
-                    // Json Parsing Needed.
                     RequestModel requestModel = gson.fromJson(topicMessage.getPayload(), RequestModel.class);
-                    if (requestModel.getStatus().equals("REQ")) {
-                        if (modelRepository.getRequestModelHashMap().containsKey(requestModel.getSenderName()) == false) {
-                            modelRepository.getRequestModelHashMap().put(requestModel.getSenderName(), requestModel);
-                            modelRepository.getRequestModelList().add(requestModel);
-                        }
+
+                    // REQ
+                    if (requestModel.getReqType() == 1) {
+                        addRequestModel(requestModel);
                     }
-                    else if (requestModel.getStatus().equals("ACK")) {
-                        FriendModel friendModel = new FriendModel(requestModel.getReceiverName());
-                        modelRepository.getFriendModelHashMap().put(friendModel.getFriendName(), friendModel);
-                        modelRepository.getFriendModelList().add(friendModel);
+                    // ACK
+                    else if (requestModel.getReqType() == 2) {
+                        // 해당 친구(사용자) 이름을 MySQL에서 조회한 후 UserInformation을 받아
+                        // Database(SQLite)와 ArrayList에 저장한다.
+                        addFriendUserInformation(requestModel.getReqReceiverName());
+                    }
+                    // TopicChannel
+                    else if (requestModel.getReqType() == 3) {
+
                     }
                 })
         );
     }
 
     public void createQueueChannel() {
-        createChatRoom("/queue/" + modelRepository.getCurUserInformation().getUserName());
+        compositeDisposable.add(modelRepository.stompGetTopicMessage("/queue/" + modelRepository.getUserRegisterModel().getRegUserName())
+                        .subscribe(topicMessage -> {
+                            MessageModel receivedMessage = gson.fromJson(topicMessage.getPayload(), MessageModel.class);
 
-    }
+                            // 내가 보낸 Message를 중복으로 받지 않기 위한 조건.
+                            if (!receivedMessage.getMsgSenderName().equals(modelRepository.getUserRegisterModel().getRegUserName())) {
 
-    public void createTopicChannel() {
-        createChatRoom("/topic/" + modelRepository.getCurUserInformation().getUserName());
-    }
+                                Toast.makeText(context, receivedMessage.getMsgContent(), Toast.LENGTH_SHORT).show();
+                                Log.d("QueueChannelCheck", "In MainViewModel");
+                                String chatChannel = "";
 
-    public void createChatRoom(String topic)
-    {
-        // /topic/greetings에 가입하면 해당 Chat Room에 대한 Event, 즉, Message들을 .subscribe에서 받아온다.
-        // compositeDisposable.add(mStompClient.topic("/topic/greetings")
-        compositeDisposable.add(modelRepository.stompGetTopicMessage(topic)
-                .subscribe(topicMessage -> {
-                    // Json Parsing Needed.
-                    rMessageModel = gson.fromJson(topicMessage.getPayload(), MessageModel.class);
-                    messageModels.add(rMessageModel);
-                    Log.d(TAG, "Received : " + rMessageModel.getContents());
-                    positionEvent.setValue(messageModels.size() - 1);
+                                // MsgSender에 대한 ChatModel이 존재하지 않을 경우 생성해야한다.
+                                    if (modelRepository.getChatModel((chatChannel = receivedMessage.getChatChannel())) == null) {
+                                        List<ParticipantModel> participantModels = new ArrayList<>();
+                                        participantModels.add(new ParticipantModel(receivedMessage.getMsgSenderName(), chatChannel, modelRepository.getUserRegisterModel().getRegUserName()));
+                                        participantModels.add(new ParticipantModel(modelRepository.getUserRegisterModel().getRegUserName(), chatChannel, modelRepository.getUserRegisterModel().getRegUserName()));
+
+                                    // createChatModel을 호출하면 chatModels에 add한다.
+                                    ChatModel chatModel = modelRepository.createChatModel(
+                                            chatChannel,
+                                            receivedMessage.getMsgSenderName(),
+                                            participantModels
+                                    );
+
+                                    chatModel.getMessageModels().add(receivedMessage);
+
+                                    insertClientDBChatRoomModel(chatModel.getChatRoomModel());
+                                    insertClientDBMessageModel(receivedMessage);
+
+                                    for (ParticipantModel pm : chatModel.getParticipantModels()) {
+                                        insertClientDBParticipantModel(pm);
+                                    }
+                                }
+                                else {
+                                    modelRepository.addMessageModelToChatModels(receivedMessage);
+                                    insertClientDBMessageModel(receivedMessage);
+                                }
+                            }
                 })
         );
     }
 
-    public MessageModel getMessageModelAt(int position) {
-        return messageModels.get(position);
+    public void addRequestModel(RequestModel requestModel) {
+        modelRepository.getRequestModel(requestModel.getReqSenderName())
+                .subscribe(new MaybeObserver<RequestModel>() {
+                    @Override
+                    public void onSubscribe(Disposable d) {
+                        compositeDisposable.add(d);
+                    }
+
+                    @Override
+                    public void onSuccess(RequestModel requestModel) {
+
+                    }
+
+                    @Override
+                    public void onError(Throwable e) {
+
+                    }
+
+                    @Override
+                    public void onComplete() {
+                        // Add to Database
+                        insertClientDBRequestModel(requestModel);
+                        // Add to ArrayList
+                        modelRepository.addRequestModel(requestModel);
+                    }
+                });
     }
 
-    public void sendButtonClikced() {
-        if (sMessageModel == null) sMessageModel = new MessageModel();
+    public void insertClientDBChatRoomModel(ChatRoomModel chatRoomModel) {
+        modelRepository.insertClientDBChatRoomModel(chatRoomModel)
+                .subscribe(new CompletableObserver() {
+                    @Override
+                    public void onSubscribe(Disposable d) {
+                        compositeDisposable.add(d);
+                    }
 
-        sMessageModel.setSenderName(MainActivity.intentUserInformation.getUserName());
-        sMessageModel.setChatRoomName("topic/greetings");
-        sMessageModel.setContents(messageEdit.get());
-        sMessageModel.setSenderSideDate("2019/12/16");
-        messageEdit.set("");
+                    @Override
+                    public void onComplete() {
 
-        compositeDisposable.add(modelRepository.stompSendMessage("/app/end", gson.toJson(sMessageModel))
-                .subscribe(() -> {
-                    Log.d(TAG, "STOMP echo send successfully");
-                }, throwable -> {
-                    Log.e(TAG, "Error send STOMP echo", throwable);
-                }));
+                    }
+
+                    @Override
+                    public void onError(Throwable e) {
+
+                    }
+                });
+    }
+
+    public void insertClientDBMessageModel(MessageModel messageModel) {
+        modelRepository.insertClientDBMessageModel(messageModel)
+                .subscribe(new CompletableObserver() {
+                    @Override
+                    public void onSubscribe(Disposable d) {
+                        compositeDisposable.add(d);
+                    }
+
+                    @Override
+                    public void onComplete() {
+
+                    }
+
+                    @Override
+                    public void onError(Throwable e) {
+
+                    }
+                });
+    }
+
+    public void insertClientDBParticipantModel(ParticipantModel participantModel) {
+        modelRepository.insertClientDBParticipantModel(participantModel)
+                .subscribe(new CompletableObserver() {
+                    @Override
+                    public void onSubscribe(Disposable d) {
+                        compositeDisposable.add(d);
+                    }
+
+                    @Override
+                    public void onComplete() {
+
+                    }
+
+                    @Override
+                    public void onError(Throwable e) {
+
+                    }
+                });
+    }
+
+    public void insertClientDBRequestModel(RequestModel requestModel) {
+        modelRepository.insertClientDBRequestModel(requestModel)
+                .subscribe(new CompletableObserver() {
+                    @Override
+                    public void onSubscribe(Disposable d) {
+                        compositeDisposable.add(d);
+                    }
+
+                    @Override
+                    public void onComplete() {
+
+                    }
+
+                    @Override
+                    public void onError(Throwable e) {
+
+                    }
+                });
+    }
+
+    public void addFriendUserInformation(String friendUserName) {
+        modelRepository.retrofitGetUserInformationModel(friendUserName)
+                .subscribe(new SingleObserver<UserInformationModel>() {
+                    @Override
+                    public void onSubscribe(Disposable d) {
+                        compositeDisposable.add(d);
+                    }
+
+                    @Override
+                    public void onSuccess(UserInformationModel userInformationModel) {
+                        // Add To Database
+                        insertClientDBUserInformationModel(userInformationModel);
+                        // Add To ArrayList
+                        modelRepository.addUserInformationModel(userInformationModel);
+                    }
+
+                    @Override
+                    public void onError(Throwable e) {
+
+                    }
+                });
+    }
+
+    public void insertClientDBUserInformationModel(UserInformationModel userInformationModel) {
+        modelRepository.insertClientDBUserInformationModel(userInformationModel)
+                .subscribe(new CompletableObserver() {
+                    @Override
+                    public void onSubscribe(Disposable d) {
+                        compositeDisposable.add(d);
+                    }
+
+                    @Override
+                    public void onComplete() {
+                        // Insert To SQLite Successfully
+                    }
+
+                    @Override
+                    public void onError(Throwable e) {
+
+                    }
+                });
     }
 
     private void resetSubscriptions() {
@@ -202,7 +319,7 @@ public class MainViewModel extends AndroidViewModel implements Serializable {
     protected void onCleared() {
         super.onCleared();
         compositeDisposable.dispose();
-        Log.i(TAG, "onCleared() Method is called ......................");
+        Log.i("QueueChannelCheck", "MainViewModel : onCleared()");
         //modelRepository.stompDisconnectStart(); // 과연 Disconnect 해야 하는가? 에 대한 이해는 조금 더 해 봐야 알 듯.
     }
 }

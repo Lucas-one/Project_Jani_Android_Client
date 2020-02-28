@@ -27,13 +27,14 @@ public class ChatRoomActivity extends AppCompatActivity {
     @Override
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
+
         dataBindingInit();
+        getLiveDataEvent();
     }
 
     public void dataBindingInit() {
         activityChatRoomBinding = DataBindingUtil.setContentView(this, R.layout.activity_chat_room);
         activityChatRoomBinding.setLifecycleOwner(this);
-        activityChatRoomBinding.setChatRoomAcitivty(this);
 
         chatRoomViewModel = ViewModelProviders.of(this).get(ChatRoomViewModel.class);
         activityChatRoomBinding.setChatRoomViewModel(chatRoomViewModel);
@@ -41,8 +42,22 @@ public class ChatRoomActivity extends AppCompatActivity {
         activityChatRoomBinding.recyclerView.setLayoutManager(new LinearLayoutManager(this));
 
         // Binds ChatRoomAdapter.class
-        //chatRoomAdapter = new ChatRoomAdapter(chatRoomViewModel);
+        chatRoomAdapter = new ChatRoomAdapter(chatRoomViewModel);
+
         activityChatRoomBinding.setChatRoomAdapter(chatRoomAdapter);
         activityChatRoomBinding.recyclerView.setAdapter(chatRoomAdapter);
+    }
+
+    public void getLiveDataEvent() {
+        activityChatRoomBinding.recyclerView.scrollToPosition(chatRoomAdapter.getItemCount() - 1);
+        chatRoomViewModel.getMessageEvent()
+                .observe(this, new Observer<Integer>() {
+                    @Override
+                    public void onChanged(Integer flag) {
+                        if (flag == 0) {
+                            activityChatRoomBinding.recyclerView.scrollToPosition(chatRoomAdapter.getItemCount() - 1);
+                        }
+                    }
+                });
     }
 }

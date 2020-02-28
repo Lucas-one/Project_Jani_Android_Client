@@ -2,8 +2,6 @@ package com.example.websocketclient.viewmodels;
 
 import android.app.Application;
 import android.content.Context;
-import android.util.Log;
-import android.widget.Toast;
 
 import androidx.annotation.NonNull;
 import androidx.databinding.ObservableBoolean;
@@ -11,12 +9,16 @@ import androidx.lifecycle.AndroidViewModel;
 import androidx.lifecycle.LiveData;
 import androidx.lifecycle.MutableLiveData;
 
-import com.example.websocketclient.models.FriendModel;
+import com.example.websocketclient.database.entity.UserInformationModel;
 import com.example.websocketclient.models.ModelRepository;
-import com.example.websocketclient.models.RequestModel;
 import com.google.gson.Gson;
 
+import java.util.List;
+
+import io.reactivex.MaybeObserver;
+import io.reactivex.Observer;
 import io.reactivex.disposables.CompositeDisposable;
+import io.reactivex.disposables.Disposable;
 
 public class FriendListFragmentViewModel extends AndroidViewModel {
 
@@ -58,28 +60,6 @@ public class FriendListFragmentViewModel extends AndroidViewModel {
         return this.modelRepository;
     }
 
-    public void createRequestChannel() {
-        Toast.makeText(context, modelRepository.getCurUserInformation().getUserName(), Toast.LENGTH_LONG).show();
-        compositeDisposable.add(modelRepository.stompGetTopicMessage("/req/" + modelRepository.getCurUserInformation().getUserName())
-                .subscribe(topicMessage -> {
-                    // Json Parsing Needed.
-                    RequestModel requestModel = gson.fromJson(topicMessage.getPayload(), RequestModel.class);
-                    if (requestModel.getStatus().equals("REQ")) {
-                        modelRepository.getRequestModelHashMap().put(requestModel.getSenderName(), requestModel);
-                        modelRepository.getRequestModelList().add(requestModel);
-                        //modelRepository.addRequestModel(gson.fromJson(topicMessage.getPayload(), RequestModel.class));
-                    }
-                    else if (requestModel.getStatus().equals("ACK")) {
-                        FriendModel friendModel = new FriendModel(requestModel.getReceiverName());
-
-                        modelRepository.getFriendModelHashMap().put(friendModel.getFriendName(), friendModel);
-                        modelRepository.getFriendModelList().add(friendModel);
-                        //modelRepository.addFriendList(friendModel);
-                    }
-                })
-        );
-    }
-
     public void addFriendButtonClicked() {
         buttonEvent.setValue(ADD);
     }
@@ -89,7 +69,7 @@ public class FriendListFragmentViewModel extends AndroidViewModel {
     }
 
     public void listItemClicked(int position) {
-        modelRepository.setSelectedFriendModel(modelRepository.getFriendModelAt(position));
+        modelRepository.setSelectedUserInformationModel(modelRepository.getUserInformationModelAt(position));
         profileEvent.setValue(true);
     }
 

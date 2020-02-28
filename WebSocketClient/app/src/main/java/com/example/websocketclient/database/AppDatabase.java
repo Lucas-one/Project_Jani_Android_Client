@@ -6,24 +6,30 @@ import androidx.room.Database;
 import androidx.room.Room;
 import androidx.room.RoomDatabase;
 
-import com.example.websocketclient.database.dao.FriendDao;
+import com.example.websocketclient.database.dao.ChatModelDao;
+import com.example.websocketclient.database.dao.RegisterModelDao;
+import com.example.websocketclient.database.dao.RequestModelDao;
 import com.example.websocketclient.database.dao.UserDao;
-import com.example.websocketclient.database.entity.FriendInformation;
-import com.example.websocketclient.database.entity.UserInformation;
+import com.example.websocketclient.database.entity.ChatRoomModel;
+import com.example.websocketclient.database.entity.MessageModel;
+import com.example.websocketclient.database.entity.ParticipantModel;
+import com.example.websocketclient.database.entity.RegisterModel;
+import com.example.websocketclient.database.entity.RequestModel;
+import com.example.websocketclient.database.entity.UserInformationModel;
 
-@Database(entities = {UserInformation.class/*, FriendInformation.class*/}, version = 1, exportSchema = false)
+@Database(entities = {UserInformationModel.class, RequestModel.class, RegisterModel.class, ParticipantModel.class, MessageModel.class, ChatRoomModel.class}, version = 1, exportSchema = false)
 public abstract class AppDatabase extends RoomDatabase {
     private static AppDatabase instance;
 
     public static AppDatabase getInstance(Context context) {
         if (instance == null) {
-            instance = Room.databaseBuilder(context.getApplicationContext(), AppDatabase.class, "jani_database").build();
+            instance = Room.databaseBuilder(context.getApplicationContext(), AppDatabase.class, "plztesttttt").build();
         }
         return instance;
     }
     public static AppDatabase newInstance(Context context) {
         instance = null;
-        instance = Room.databaseBuilder(context.getApplicationContext(), AppDatabase.class, "jani_database").build();
+        instance = Room.databaseBuilder(context.getApplicationContext(), AppDatabase.class, "plztesttttt").build();
         return instance;
     }
 
@@ -32,5 +38,7 @@ public abstract class AppDatabase extends RoomDatabase {
     }
 
     public abstract UserDao userDao();
-    //public abstract FriendDao friendDao();
+    public abstract RegisterModelDao registerModelDao();
+    public abstract RequestModelDao requestModelDao();
+    public abstract ChatModelDao chatModelDao();
 }
