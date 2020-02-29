@@ -23,6 +23,7 @@ import com.google.gson.Gson;
 import java.io.Serializable;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.StringTokenizer;
 
 import io.reactivex.CompletableObserver;
 import io.reactivex.CompletableOperator;
@@ -58,7 +59,8 @@ public class MainViewModel extends AndroidViewModel implements Serializable {
 
         createRequestChannel();
         createQueueChannel();
-        //createTopicChannel();
+        createTopicChannels();
+
         stompConnect();
     }
 
@@ -95,20 +97,32 @@ public class MainViewModel extends AndroidViewModel implements Serializable {
         compositeDisposable.add(modelRepository.stompGetTopicMessage("/req/" + modelRepository.getUserRegisterModel().getRegUserName())
                 .subscribe(topicMessage -> {
                     RequestModel requestModel = gson.fromJson(topicMessage.getPayload(), RequestModel.class);
-
+                    int type = requestModel.getReqType();
                     // REQ
-                    if (requestModel.getReqType() == 1) {
+                    if (type == 1) {
                         addRequestModel(requestModel);
                     }
                     // ACK
-                    else if (requestModel.getReqType() == 2) {
+                    else if (type == 2) {
                         // 해당 친구(사용자) 이름을 MySQL에서 조회한 후 UserInformation을 받아
                         // Database(SQLite)와 ArrayList에 저장한다.
                         addFriendUserInformation(requestModel.getReqReceiverName());
                     }
                     // TopicChannel
-                    else if (requestModel.getReqType() == 3) {
+                    else if (type == 3) {
 
+                    }
+
+                    // ParticipantName
+                    // Delimeter = ':'
+                    else if (type == 4) {
+                        StringTokenizer st = new StringTokenizer(requestModel.getReqSenderName(), ":");
+
+                        createTopicChannel(requestModel.getChatChannel());
+
+                        while (st.hasMoreTokens()) {
+                            modelRepository.getTempParticipantModels().add(new ParticipantModel(st.nextToken(), requestModel.getChatChannel(), modelRepository.getUserRegisterModel().getRegUserName()));
+                        }
                     }
                 })
         );
@@ -118,7 +132,7 @@ public class MainViewModel extends AndroidViewModel implements Serializable {
         compositeDisposable.add(modelRepository.stompGetTopicMessage("/queue/" + modelRepository.getUserRegisterModel().getRegUserName())
                         .subscribe(topicMessage -> {
                             MessageModel receivedMessage = gson.fromJson(topicMessage.getPayload(), MessageModel.class);
-
+                            receivedMessage.setMsgOwner(modelRepository.getUserRegisterModel().getRegUserName());
                             // 내가 보낸 Message를 중복으로 받지 않기 위한 조건.
                             if (!receivedMessage.getMsgSenderName().equals(modelRepository.getUserRegisterModel().getRegUserName())) {
 
@@ -127,10 +141,10 @@ public class MainViewModel extends AndroidViewModel implements Serializable {
                                 String chatChannel = "";
 
                                 // MsgSender에 대한 ChatModel이 존재하지 않을 경우 생성해야한다.
-                                    if (modelRepository.getChatModel((chatChannel = receivedMessage.getChatChannel())) == null) {
-                                        List<ParticipantModel> participantModels = new ArrayList<>();
-                                        participantModels.add(new ParticipantModel(receivedMessage.getMsgSenderName(), chatChannel, modelRepository.getUserRegisterModel().getRegUserName()));
-                                        participantModels.add(new ParticipantModel(modelRepository.getUserRegisterModel().getRegUserName(), chatChannel, modelRepository.getUserRegisterModel().getRegUserName()));
+                                if (modelRepository.getChatModel((chatChannel = receivedMessage.getChatChannel())) == null) {
+                                    List<ParticipantModel> participantModels = new ArrayList<>();
+                                    participantModels.add(new ParticipantModel(receivedMessage.getMsgSenderName(), chatChannel, modelRepository.getUserRegisterModel().getRegUserName()));
+                                    participantModels.add(new ParticipantModel(modelRepository.getUserRegisterModel().getRegUserName(), chatChannel, modelRepository.getUserRegisterModel().getRegUserName()));
 
                                     // createChatModel을 호출하면 chatModels에 add한다.
                                     ChatModel chatModel = modelRepository.createChatModel(
@@ -153,6 +167,119 @@ public class MainViewModel extends AndroidViewModel implements Serializable {
                                     insertClientDBMessageModel(receivedMessage);
                                 }
                             }
+                })
+        );
+    }
+
+    public void createTopicChannels() {
+        for (ChatModel cm : modelRepository.getChatModels()) {
+            if (cm.getChatRoomModel().getChatChannel().contains("/topic/")) {
+                compositeDisposable.add(modelRepository.stompGetTopicMessage(cm.getChatRoomModel().getChatChannel())
+                        .subscribe(topicMessage -> {
+                            MessageModel receivedMessage = gson.fromJson(topicMessage.getPayload(), MessageModel.class);
+                            receivedMessage.setMsgOwner(modelRepository.getUserRegisterModel().getRegUserName());
+
+                            if (!receivedMessage.getMsgSenderName().equals(modelRepository.getUserRegisterModel().getRegUserName())) {
+                                String chatChannel = "";
+                                String chatRoomName = "";
+
+                                if (modelRepository.getChatModel((chatChannel = receivedMessage.getChatChannel())) == null) {
+                                    List<ParticipantModel> participantModels = new ArrayList<>();
+                                    ParticipantModel pm;
+                                    List<ParticipantModel> tempParticipantModels = modelRepository.getTempParticipantModels();
+
+                                    for (int i = 0; i < tempParticipantModels.size(); i++) {
+                                        pm = tempParticipantModels.get(i);
+
+                                        if (pm.getChatChannel().equals(receivedMessage.getChatChannel())) {
+                                            participantModels.add(pm);
+                                            insertClientDBParticipantModel(pm);
+
+                                            if (!pm.getParticipantUserName().equals(modelRepository.getUserRegisterModel().getRegUserName())) {
+                                                chatRoomName += pm.getParticipantUserName() + ", ";
+                                            }
+
+                                            tempParticipantModels.remove(i);
+                                            i--;
+                                        }
+                                    }
+
+                                    chatRoomName = chatRoomName.substring(0, chatRoomName.length() - 2);
+
+                                    ChatModel chatModel = modelRepository.createChatModel(
+                                            chatChannel,
+                                            chatRoomName,
+                                            participantModels
+                                    );
+
+                                    chatModel.getMessageModels().add(receivedMessage);
+
+                                    insertClientDBChatRoomModel(chatModel.getChatRoomModel());
+                                    insertClientDBMessageModel(receivedMessage);
+                                } else {
+                                    modelRepository.addMessageModelToChatModels(receivedMessage);
+                                    insertClientDBMessageModel(receivedMessage);
+                                }
+                            }
+                        })
+                );
+            }
+        }
+    }
+
+    public void createTopicChannel(String topicChannel) {
+
+        compositeDisposable.add(modelRepository.stompGetTopicMessage(topicChannel)
+                .subscribe(topicMessage -> {
+                    MessageModel receivedMessage = gson.fromJson(topicMessage.getPayload(), MessageModel.class);
+                    receivedMessage.setMsgOwner(modelRepository.getUserRegisterModel().getRegUserName());
+
+                    if (!receivedMessage.getMsgSenderName().equals(modelRepository.getUserRegisterModel().getRegUserName())) {
+                        String chatChannel = "";
+                        String chatRoomName = "";
+
+                        if (modelRepository.getChatModel((chatChannel = receivedMessage.getChatChannel())) == null) {
+                            List<ParticipantModel> participantModels = new ArrayList<>();
+                            ParticipantModel pm;
+                            List<ParticipantModel> tempParticipantModels = modelRepository.getTempParticipantModels();
+
+                            for (int i = 0; i < tempParticipantModels.size(); i++) {
+                                pm = tempParticipantModels.get(i);
+
+                                Log.d("formatChecking", pm.getParticipantUserName());
+                                Log.d("formatChecking", pm.getChatChannel() + ", " + receivedMessage.getChatChannel());
+
+                                if (pm.getChatChannel().equals(receivedMessage.getChatChannel())) {
+                                    participantModels.add(pm);
+                                    insertClientDBParticipantModel(pm);
+
+                                    if (!pm.getParticipantUserName().equals(modelRepository.getUserRegisterModel().getRegUserName())) {
+                                        Log.d("formatChecking", pm.getParticipantUserName());
+                                        chatRoomName += pm.getParticipantUserName() + ", ";
+                                    }
+
+                                    tempParticipantModels.remove(i);
+                                    i--;
+                                }
+                            }
+
+                            chatRoomName = chatRoomName.substring(0, chatRoomName.length() - 2);
+
+                            ChatModel chatModel = modelRepository.createChatModel(
+                                    chatChannel,
+                                    chatRoomName,
+                                    participantModels
+                            );
+
+                            chatModel.getMessageModels().add(receivedMessage);
+
+                            insertClientDBChatRoomModel(chatModel.getChatRoomModel());
+                            insertClientDBMessageModel(receivedMessage);
+                        } else {
+                            modelRepository.addMessageModelToChatModels(receivedMessage);
+                            insertClientDBMessageModel(receivedMessage);
+                        }
+                    }
                 })
         );
     }
@@ -320,7 +447,7 @@ public class MainViewModel extends AndroidViewModel implements Serializable {
         super.onCleared();
         compositeDisposable.dispose();
         Log.i("QueueChannelCheck", "MainViewModel : onCleared()");
-        //modelRepository.stompDisconnectStart(); // 과연 Disconnect 해야 하는가? 에 대한 이해는 조금 더 해 봐야 알 듯.
+        modelRepository.stompDisconnectStart(); // 과연 Disconnect 해야 하는가? 에 대한 이해는 조금 더 해 봐야 알 듯.
     }
 }
 

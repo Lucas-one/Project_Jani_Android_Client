@@ -42,7 +42,7 @@ public class ChatRoomViewModel extends AndroidViewModel {
         modelRepository = ModelRepository.getInstance();
         modelRepository.setReferences(context);
         subscribeToQueueChannel();
-
+        subscribeToTopicChannel();
         Log.d("QueueChannelCheck", "chat room list num = " + modelRepository.getChatModels().size());
     }
 
@@ -50,6 +50,14 @@ public class ChatRoomViewModel extends AndroidViewModel {
         compositeDisposable.add(modelRepository.stompGetTopicMessage("/queue/" + modelRepository.getUserRegisterModel().getRegUserName())
                 .subscribe(topicMessage -> {
                     Log.d("QueueChannelCheck", "In ChatRoomViewModel");
+                    messageEvent.setValue(0);
+                }));
+    }
+
+    public void subscribeToTopicChannel() {
+        compositeDisposable.add(modelRepository.stompGetTopicMessage(modelRepository.getSelectedChatModel().getChatRoomModel().getChatChannel())
+                .subscribe(topicMessage -> {
+                    Log.d("TopicChannelCheck", "In ChatRoomViewModel");
                     messageEvent.setValue(0);
                 }));
     }
@@ -62,11 +70,13 @@ public class ChatRoomViewModel extends AndroidViewModel {
         ChatModel selectedChatModel = modelRepository.getSelectedChatModel();
         String userName = modelRepository.getUserRegisterModel().getRegUserName();
 
+        Log.d("formatChecking", selectedChatModel.getChatRoomModel().getChatChannel());
+
         MessageModel mMessageModel = new MessageModel(
                 0,
                 selectedChatModel.getParticipantModels().size(),
                 selectedChatModel.getChatRoomModel().getChatChannel().substring(7),
-                "/queue/" + userName,
+                selectedChatModel.getChatRoomModel().getChatChannel().contains("/topic/") ? selectedChatModel.getChatRoomModel().getChatChannel() : "/queue/" + userName,
                 userName,
                 getDateFormatString(),
                 messageEdit.get()
@@ -113,27 +123,6 @@ public class ChatRoomViewModel extends AndroidViewModel {
     public ModelRepository getModelRepository() {
         return this.modelRepository;
     }
-
-    /*public void sendButtonClicked() {
-        MessageModel sMessageModel = new MessageModel();
-
-        ChatRoomModel selectedChatRoomModel = modelRepository.getSelectedChatRoomModel();
-
-        sMessageModel.setSenderName(modelRepository.getCurUserInformation().getUserName());
-        sMessageModel.setSenderChatChannel("/queue/" + modelRepository.getCurUserInformation().getUserName());
-        sMessageModel.setContents(messageEdit.get());
-        sMessageModel.setSenderSideDate(getDateFormatString());
-
-        compositeDisposable.add(modelRepository.stompSendMessage("/app" + selectedChatRoomModel.getSenderChatChannel(), gson.toJson(sMessageModel))
-                .subscribe(() -> {
-                    Log.d(TAG, "STOMP echo send successfully and content : " + sMessageModel.getContents());
-                    selectedChatRoomModel.getMessageModels().add(sMessageModel);
-                    messageEdit.set("");
-                    messageEvent.setValue(0);
-                }, throwable -> {
-                    Log.e(TAG, "Error send STOMP echo", throwable);
-                }));
-    }*/
 
     public String getDateFormatString() {
         Date date = new Date(System.currentTimeMillis());

@@ -30,6 +30,9 @@ public interface RetrofitCommunicationService {
     @POST("/get-user-info")
     Single<UserInformationModel> getUserInformationModel(@Body String userName);
 
+    @POST("/get-topic-channel")
+    Single<PlainTextModel> getTopicChannel();
+
     @POST("/get-request-model")
     Observable<List<RequestModel>> getRequstModelList(@Body String userName);
 

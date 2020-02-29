@@ -4,6 +4,8 @@ import android.content.Context;
 import android.os.Message;
 import android.util.Log;
 
+import androidx.lifecycle.AndroidViewModel;
+
 import com.example.websocketclient.database.AppDatabase;
 import com.example.websocketclient.database.entity.ChatRoomModel;
 import com.example.websocketclient.database.entity.MessageModel;
@@ -15,6 +17,7 @@ import com.example.websocketclient.retrofit.utils.RetrofitClient;
 import com.example.websocketclient.retrofit.utils.RetrofitCommunicationService;
 import com.example.websocketclient.viewmodels.MainViewModel;
 
+import java.lang.reflect.Array;
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
@@ -40,6 +43,7 @@ public class ModelRepository {
     public final String TAG = "ModelRepositoryLog";
     public static final String LOGIN = "login";
     public static final String PASSCODE = "passcode";
+    private String topicChannel;
 
     private Context context;
     private AppDatabase db;
@@ -52,7 +56,9 @@ public class ModelRepository {
     private List<ChatRoomModel> chatRoomModels;
     private List<MessageModel> messageModels;
     private List<ParticipantModel> participantModels;
+    private List<ParticipantModel> tempParticipantModels;
     private List<ChatModel> chatModels;
+    private List<ChatModel> tempChatModels;
 
     private UserInformationModel selectedUserInformationModel;
     private ChatModel selectedChatModel;
@@ -110,6 +116,14 @@ public class ModelRepository {
 
     public void setSelectedChatModel(ChatModel selectedChatModel) {
         this.selectedChatModel = selectedChatModel;
+    }
+
+    public List<ParticipantModel> getTempParticipantModels() {
+        return tempParticipantModels;
+    }
+
+    public List<ChatModel> getTempChatModels() {
+        return tempChatModels;
     }
 
     // ================================== RequestModel =============================================
@@ -298,6 +312,8 @@ public class ModelRepository {
         messageModels = new ArrayList<>();
         participantModels = new ArrayList<>();
         chatModels = new ArrayList<>();
+        tempParticipantModels = new ArrayList<>();
+        tempChatModels = new ArrayList<>();
 
         return Maybe.zip(
                 loadUserInformationModels(),
@@ -405,6 +421,20 @@ public class ModelRepository {
         return retrofitCommunicationService.getUserInformationModel(userName)
                 .subscribeOn(Schedulers.io())
                 .observeOn(AndroidSchedulers.mainThread());
+    }
+
+    public Single<PlainTextModel> retrofitGetTopicChannel() {
+        return retrofitCommunicationService.getTopicChannel()
+                .subscribeOn(Schedulers.io())
+                .observeOn(AndroidSchedulers.mainThread());
+    }
+
+    public String getTopicChannel() {
+        return topicChannel;
+    }
+
+    public void setTopicChannel(String topicChannel) {
+        this.topicChannel = topicChannel;
     }
 
 

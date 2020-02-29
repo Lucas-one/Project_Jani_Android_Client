@@ -42,7 +42,7 @@
                 android:textSize="18sp"
                 android:gravity="center_vertical"
                 android:paddingLeft="15sp"
-                android:text="@{chatRoomListViewModel.modelRepository.getChatModelAt(position).lastMessageModel.msgContent}">
+                android:text="@{chatRoomListViewModel.modelRepository.getChatModelAt(position).lastMessage}">
             </TextView>
         </LinearLayout>
         <TextView
@@ -52,7 +52,7 @@
             android:textSize="15sp"
             android:paddingTop="20sp"
             android:gravity="center_horizontal"
-            android:text="@{chatRoomListViewModel.modelRepository.getChatModelAt(position).lastMessageModel.senderSideDate}">
+            android:text="@{chatRoomListViewModel.modelRepository.getChatModelAt(position).lastSenderSideDate}">
         </TextView>
     </LinearLayout>
 </layout>
