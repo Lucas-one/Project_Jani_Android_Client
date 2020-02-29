@@ -24,6 +24,7 @@
             android:layout_height="wrap_content"
             android:orientation="vertical">
 
+<<<<<<< HEAD
             <TextView
                 android:text="간편 가입"
                 android:layout_width="match_parent"
@@ -53,6 +54,25 @@
                 android:text="@={registerViewModel.userPasswordEdit}"
                 android:maxLength="10"
                 android:hint="3-10자리의 비밀번호를 입력해주세요.">
+=======
+        </EditText>
+        <EditText
+            android:id="@+id/user_password_edit"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:gravity="center_horizontal"
+            android:textSize="20sp"
+            android:hint="7자리 이상의 비밀번호를 입력해주세요">
+
+        </EditText>
+        <Button
+            android:id="@+id/register_btn"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:text="계정 생성"
+            android:textSize="25dp"/>
+    </LinearLayout>
+>>>>>>> 734f2d47d8bdb33547b2b0b0fb8f4369c919dc5c
 
             </EditText>
             <Button

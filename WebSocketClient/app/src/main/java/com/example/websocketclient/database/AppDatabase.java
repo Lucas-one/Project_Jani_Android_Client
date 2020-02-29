@@ -10,12 +10,21 @@ import com.example.websocketclient.database.dao.ChatModelDao;
 import com.example.websocketclient.database.dao.RegisterModelDao;
 import com.example.websocketclient.database.dao.RequestModelDao;
 import com.example.websocketclient.database.dao.UserDao;
+<<<<<<< HEAD
 import com.example.websocketclient.database.entity.ChatRoomModel;
 import com.example.websocketclient.database.entity.MessageModel;
 import com.example.websocketclient.database.entity.ParticipantModel;
 import com.example.websocketclient.database.entity.RegisterModel;
 import com.example.websocketclient.database.entity.RequestModel;
 import com.example.websocketclient.database.entity.UserInformationModel;
+=======
+import com.example.websocketclient.database.entity.FriendInformation;
+import com.example.websocketclient.database.entity.UserInformation;
+
+//유튜브에서 UserInformation = Todo yj
+@Database(entities = {UserInformation.class/*, FriendInformation.class*/}, version = 1, exportSchema = false)
+public abstract class AppDatabase extends RoomDatabase {    //Primary Key 각각 User,Friend InFo 클래스에서 선언
+>>>>>>> 734f2d47d8bdb33547b2b0b0fb8f4369c919dc5c
 
 @Database(entities = {UserInformationModel.class, RequestModel.class, RegisterModel.class, ParticipantModel.class, MessageModel.class, ChatRoomModel.class}, version = 1, exportSchema = false)
 public abstract class AppDatabase extends RoomDatabase {
@@ -27,7 +36,7 @@ public abstract class AppDatabase extends RoomDatabase {
         }
         return instance;
     }
-    public static AppDatabase newInstance(Context context) {
+    public static AppDatabase newInstance(Context context) {//데이터베이스 생성
         instance = null;
         instance = Room.databaseBuilder(context.getApplicationContext(), AppDatabase.class, "abcdefghi").build();
         return instance;
