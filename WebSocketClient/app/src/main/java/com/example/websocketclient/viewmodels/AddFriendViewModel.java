@@ -26,8 +26,6 @@ import io.reactivex.disposables.Disposable;
 public class AddFriendViewModel extends AndroidViewModel {
 
     private final String TAG = "AddFriendLog";
-    private final int OK = 0;
-    private final int NO = 1;
 
     private Context context;
     private ModelRepository modelRepository;
@@ -40,7 +38,7 @@ public class AddFriendViewModel extends AndroidViewModel {
     public ObservableField<String> twoButtonTextView = new ObservableField<>();
 
     private MutableLiveData<String> isUserExist;
-    private MutableLiveData<Integer> commandEvent;
+    private MutableLiveData<String> commandEvent;
 
     private Gson gson = new Gson();
 
@@ -55,7 +53,7 @@ public class AddFriendViewModel extends AndroidViewModel {
         return isUserExist = new MutableLiveData<>();
     }
 
-    public LiveData<Integer> getCommandEvent() {
+    public LiveData<String> getCommandEvent() {
         return commandEvent = new MutableLiveData<>();
     }
 
@@ -118,20 +116,20 @@ public class AddFriendViewModel extends AndroidViewModel {
         if (isUserExist.getValue().equals("REQUEST_EXIST")) {
             // 해당 사용자로부터 요청이 존재할 경우
 
+            // Sender에게 ACK을 전송해준다.
+            sendAckToSenderViaStomp(friendUserName);
+
             // 해당 사용자를 친구로 추가한다.
             addFriendUserInformation(friendUserName);
             // 해당 RequestModel을 ArrayList에서 삭제한다.
             modelRepository.deleteRequestModel(friendUserName);
             // 해당 RequestModel을 SQLite에서 삭제한다.
             deleteRequestModelFromClientDB(friendUserName) ;
-
-            // Sender에게 ACK을 전송해준다.
-            sendAckToSenderViaStomp(friendUserName);
-
         }
         else {
             // 해당 사용자에게 요청을 할 경우
             // RequestModel을 해당 사용자에게 전송한다.
+            RequestModel requestModel = new RequestModel(1, modelRepository.getUserRegisterModel().getRegUserName(), friendUserName);
             requestFriendToUser(friendUserName);
         }
     }
@@ -146,6 +144,8 @@ public class AddFriendViewModel extends AndroidViewModel {
 
                     @Override
                     public void onSuccess(RequestModel requestModel) {
+                        // Request Type 2 : ACK
+                        requestModel.setReqType(2);
                         sendMessageViaStomp("/app/req/" + requestModel.getReqSenderName(), requestModel);
                     }
 
@@ -165,6 +165,16 @@ public class AddFriendViewModel extends AndroidViewModel {
         compositeDisposable.add(modelRepository
                 .stompSendMessage(destination, gson.toJson((RequestModel)model))
                 .subscribe(() -> {
+                    // REQ = 1
+                    if (((RequestModel) model).getReqType() == 1) {
+                        commandEvent.setValue("DONE");
+                    }
+                    // ACK = 2
+                    else if (((RequestModel) model).getReqType() == 2) {
+                        commandEvent.setValue(((RequestModel) model).getReqSenderName());
+                    }
+                    userNameEdit.set("");
+
                     Log.d(TAG, "STOMP echo send successfully");
                 }, throwable -> {
                     Log.e(TAG, "Error send STOMP echo", throwable);
@@ -193,15 +203,7 @@ public class AddFriendViewModel extends AndroidViewModel {
 
     public void requestFriendToUser(String friendUserName) {
         RequestModel requestModel = new RequestModel(1, modelRepository.getUserRegisterModel().getRegUserName(), friendUserName);
-
-        compositeDisposable.add(modelRepository.stompSendMessage("/app/req/" + friendUserName, gson.toJson(requestModel))
-                .subscribe(() -> {
-                    Log.d(TAG, "STOMP echo send successfully");
-                    commandEvent.setValue(2);
-
-                }, throwable -> {
-                    Log.e(TAG, "Error send STOMP echo", throwable);
-                }));
+        sendMessageViaStomp("/app/req/" + friendUserName, requestModel);
     }
 
     public void addFriendUserInformation(String friendUserName) {
@@ -246,7 +248,7 @@ public class AddFriendViewModel extends AndroidViewModel {
     }
 
     public void dismissButtonClicked() {
-        commandEvent.setValue(1);
+        commandEvent.setValue("DENY");
         userNameEdit.set("");
     }
 

@@ -4,6 +4,8 @@ import android.content.Context;
 import android.os.Message;
 import android.util.Log;
 
+import androidx.lifecycle.AndroidViewModel;
+
 import com.example.websocketclient.database.AppDatabase;
 import com.example.websocketclient.database.entity.ChatRoomModel;
 import com.example.websocketclient.database.entity.MessageModel;
@@ -15,6 +17,7 @@ import com.example.websocketclient.retrofit.utils.RetrofitClient;
 import com.example.websocketclient.retrofit.utils.RetrofitCommunicationService;
 import com.example.websocketclient.viewmodels.MainViewModel;
 
+import java.lang.reflect.Array;
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
@@ -24,11 +27,13 @@ import io.reactivex.Completable;
 import io.reactivex.CompletableTransformer;
 import io.reactivex.Flowable;
 import io.reactivex.Maybe;
+import io.reactivex.Observable;
 import io.reactivex.Single;
 import io.reactivex.android.schedulers.AndroidSchedulers;
 import io.reactivex.functions.Function3;
 import io.reactivex.functions.Function5;
 import io.reactivex.schedulers.Schedulers;
+import io.reactivex.subjects.PublishSubject;
 import kotlin.jvm.functions.Function0;
 import ua.naiksoftware.stomp.Stomp;
 import ua.naiksoftware.stomp.StompClient;
@@ -40,6 +45,7 @@ public class ModelRepository {
     public final String TAG = "ModelRepositoryLog";
     public static final String LOGIN = "login";
     public static final String PASSCODE = "passcode";
+    private String topicChannel;
 
     private Context context;
     private AppDatabase db;
@@ -52,7 +58,11 @@ public class ModelRepository {
     private List<ChatRoomModel> chatRoomModels;
     private List<MessageModel> messageModels;
     private List<ParticipantModel> participantModels;
+    private List<ParticipantModel> tempParticipantModels;
     private List<ChatModel> chatModels;
+    private List<ChatModel> tempChatModels;
+
+    private PublishSubject<ChatModel> chatModelListEvent;
 
     private UserInformationModel selectedUserInformationModel;
     private ChatModel selectedChatModel;
@@ -72,10 +82,15 @@ public class ModelRepository {
 
     public ModelRepository() {
         mStompClient = Stomp.over(Stomp.ConnectionProvider.OKHTTP, "ws://" + ServerModel.SERVER_IP + ":" + ServerModel.SERVER_PORT + "/janiwss/websocket");
+        chatModelListEvent = PublishSubject.create();
     }
 
     public void setUserRegisterModel(RegisterModel registerModel) {
         this.userRegisterModel = registerModel;
+    }
+
+    public Observable<ChatModel> getChatModelListEvent() {
+        return chatModelListEvent;
     }
 
     public RegisterModel getUserRegisterModel() {
@@ -84,6 +99,7 @@ public class ModelRepository {
 
     public void setReferences(Context context) {
         this.context = context;
+
         db = AppDatabase.getInstance(this.context);
         retrofitCommunicationService = RetrofitClient.getInstance();
     }
@@ -110,6 +126,14 @@ public class ModelRepository {
 
     public void setSelectedChatModel(ChatModel selectedChatModel) {
         this.selectedChatModel = selectedChatModel;
+    }
+
+    public List<ParticipantModel> getTempParticipantModels() {
+        return tempParticipantModels;
+    }
+
+    public List<ChatModel> getTempChatModels() {
+        return tempChatModels;
     }
 
     // ================================== RequestModel =============================================
@@ -252,13 +276,15 @@ public class ModelRepository {
         return null;
     }
 
-    public ChatModel createChatModel(String queueChannel, String chatRoomName, List<ParticipantModel> participants) {
+    public ChatModel createChatModel(String chatChannel, String chatRoomName, List<ParticipantModel> participants) {
         String userName = getUserRegisterModel().getRegUserName();
         ChatModel chatModel = null;
 
-        ChatRoomModel mChatRoomModel = new ChatRoomModel(0, userName, queueChannel, chatRoomName);
+        ChatRoomModel mChatRoomModel = new ChatRoomModel(0, userName, chatChannel, chatRoomName);
         chatModel = new ChatModel(mChatRoomModel, new ArrayList<MessageModel>(), participants);
         chatModels.add(chatModel);
+
+        chatModelListEvent.onNext(chatModel);
 
         return chatModel;
     }
@@ -298,6 +324,8 @@ public class ModelRepository {
         messageModels = new ArrayList<>();
         participantModels = new ArrayList<>();
         chatModels = new ArrayList<>();
+        tempParticipantModels = new ArrayList<>();
+        tempChatModels = new ArrayList<>();
 
         return Maybe.zip(
                 loadUserInformationModels(),
@@ -324,20 +352,6 @@ public class ModelRepository {
                     }
                 }).observeOn(AndroidSchedulers.mainThread());
     }
-
-    /*public Single<String> insertClientDBChatModel(ChatRoomModel chatRoomModel, MessageModel messageModel, ParticipantModel participantModel) {
-        return Single.zip(
-                insertClientDBChatRoomModel(chatRoomModel),
-                insertClientDBMessageModel(messageModel),
-                insertClientDBParticipantModel(participantModel),
-                new Function3<Integer, Integer, Integer, String>() {
-                    @Override
-                    public String apply(Integer integer, Integer integer2, Integer integer3) throws Exception {
-                        return "CHAT_MODEL_FIN";
-                    }
-                }
-        ).observeOn(AndroidSchedulers.mainThread());
-    }*/
 
     // ============================= Room Databse ==================================================
     public Maybe<RegisterModel> getClientDBRegisterModel() {
@@ -405,6 +419,20 @@ public class ModelRepository {
         return retrofitCommunicationService.getUserInformationModel(userName)
                 .subscribeOn(Schedulers.io())
                 .observeOn(AndroidSchedulers.mainThread());
+    }
+
+    public Single<PlainTextModel> retrofitGetTopicChannel() {
+        return retrofitCommunicationService.getTopicChannel()
+                .subscribeOn(Schedulers.io())
+                .observeOn(AndroidSchedulers.mainThread());
+    }
+
+    public String getTopicChannel() {
+        return topicChannel;
+    }
+
+    public void setTopicChannel(String topicChannel) {
+        this.topicChannel = topicChannel;
     }
 
 
