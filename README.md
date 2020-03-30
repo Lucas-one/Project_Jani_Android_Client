@@ -3,6 +3,10 @@
 `Jani Project Server GitHub`
 https://github.com/Lucas-one/Project_Jani_Spring_Boot_Websocket_Server.git
 
+## Members
+NaJunYeop - TeamLeader
+Lucas-one
+
 ## **Use**
 - **WebSocket** and **STOMP** Protocol
 
